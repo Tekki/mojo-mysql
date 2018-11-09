@@ -145,6 +145,7 @@ sub _watch {
       $err = undef if defined $rv;
       $err =~ s!\b__MSG__\b!{$dbh->errstr}!e if defined $err;
       $res->{affected_rows} = defined $rv && $rv >= 0 ? 0 + $rv : undef;
+      $res->{db} = $self;    # Need to keep db object alive
 
       $self->$cb($err, $res);
       $self->_next;
