@@ -31,24 +31,19 @@ is_deeply \@sql, ['INSERT INTO `foo` ( `bar`) VALUES ( ? ) ON DUPLICATE KEY UPDA
 
 # on conflict (unsupported value)
 
-eval { $abstract->insert('foo', {bar => 'baz'}, {on_conflict => 'do something'})};
+eval { $abstract->insert('foo', {bar => 'baz'}, {on_conflict => 'do something'}) };
 like $@, qr/on_conflict value "do something" is not allowed/, 'right error';
 
-eval { $abstract->insert('foo', {bar => 'baz'}, {on_conflict => undef})};
+eval { $abstract->insert('foo', {bar => 'baz'}, {on_conflict => undef}) };
 like $@, qr/on_conflict value "" is not allowed/, 'right error';
 
 # ORDER BY
 
 @sql = $abstract->select('foo', '*', {bar => 'baz'}, {-desc => 'yada'});
-is_deeply \@sql,
-  ['SELECT * FROM `foo` WHERE ( `bar` = ? ) ORDER BY `yada` DESC', 'baz'],
-  'right query';
+is_deeply \@sql, ['SELECT * FROM `foo` WHERE ( `bar` = ? ) ORDER BY `yada` DESC', 'baz'], 'right query';
 
-@sql = $abstract->select('foo', '*', {bar => 'baz'},
-  {order_by => {-desc => 'yada'}});
-is_deeply \@sql,
-  ['SELECT * FROM `foo` WHERE ( `bar` = ? ) ORDER BY `yada` DESC', 'baz'],
-  'right query';
+@sql = $abstract->select('foo', '*', {bar => 'baz'}, {order_by => {-desc => 'yada'}});
+is_deeply \@sql, ['SELECT * FROM `foo` WHERE ( `bar` = ? ) ORDER BY `yada` DESC', 'baz'], 'right query';
 
 # LIMIT, OFFSET
 
@@ -65,21 +60,11 @@ is_deeply \@sql, ['SELECT * FROM `foo` GROUP BY `bar`, `baz`'], 'right query';
 
 # HAVING
 
-@sql = $abstract->select('foo', '*', undef,
-  {group_by => ['bar'], having => {baz => 'yada'}});
-is_deeply \@sql,
-  ['SELECT * FROM `foo` GROUP BY `bar` HAVING `baz` = ?', 'yada'],
-  'right query';
+@sql = $abstract->select('foo', '*', undef, {group_by => ['bar'], having => {baz => 'yada'}});
+is_deeply \@sql, ['SELECT * FROM `foo` GROUP BY `bar` HAVING `baz` = ?', 'yada'], 'right query';
 
-@sql = $abstract->select(
-  'foo', '*',
-  {bar      => {'>' => 'baz'}},
-  {group_by => ['bar'], having => {baz => {'<' => 'bar'}}}
-);
-$result = [
-  'SELECT * FROM `foo` WHERE ( `bar` > ? ) GROUP BY `bar` HAVING `baz` < ?',
-  'baz', 'bar'
-];
+@sql = $abstract->select('foo', '*', {bar => {'>' => 'baz'}}, {group_by => ['bar'], having => {baz => {'<' => 'bar'}}});
+$result = ['SELECT * FROM `foo` WHERE ( `bar` > ? ) GROUP BY `bar` HAVING `baz` < ?', 'baz', 'bar'];
 is_deeply \@sql, $result, 'right query';
 
 # GROUP BY (unsupported value)
@@ -107,5 +92,41 @@ like $@, qr/for value "update skip locked" is not allowed/, 'right error';
 
 eval { $abstract->select('foo', '*', undef, {for => []}) };
 like $@, qr/ARRAYREF/, 'right error';
+
+# JSON
+
+# INSERT
+
+@sql = $abstract->insert('foo', {bar => 'baz', yada => {wibble => 'wobble'}});
+$result = [q|INSERT INTO `foo` ( `bar`, `yada`) VALUES ( ?, ? )|, 'baz', '{"wibble":"wobble"}'];
+is_deeply \@sql, $result, 'right query';
+
+# SELECT
+
+@sql = $abstract->select('foo', ['bar', 'bar->baz', 'bar->>baz.yada']);
+$result = [
+  q|SELECT `bar`,JSON_EXTRACT(`bar`,'$.baz') AS `baz`,JSON_UNQUOTE(JSON_EXTRACT(`bar`,'$.baz.yada')) AS `yada` FROM `foo`|,
+];
+is_deeply \@sql, $result, 'right query';
+
+@sql = $abstract->select('foo', '*', {'bar->>baz.yada' => 'something'});
+$result = [q|SELECT * FROM `foo` WHERE ( JSON_UNQUOTE(JSON_EXTRACT(`bar`,'$.baz.yada')) = ? )|, 'something',];
+is_deeply \@sql, $result, 'right query';
+
+@sql = $abstract->select('foo', '*', {-e => 'bar->baz.yada'});
+$result = [q|SELECT * FROM `foo` WHERE ( JSON_CONTAINS_PATH(`bar`,'one','$.baz.yada') )|,];
+is_deeply \@sql, $result, 'right query';
+
+@sql = $abstract->select('foo', '*', {-ne => 'bar->baz.yada'});
+$result = [q|SELECT * FROM `foo` WHERE ( NOT JSON_CONTAINS_PATH(`bar`,'one','$.baz.yada') )|,];
+is_deeply \@sql, $result, 'right query';
+
+# SELECT, unsupported value
+
+eval { $abstract->select('foo', '*', {-e => 'bar.baz'}) };
+like $@, qr/-e => bar.baz doesn't work/, 'right error';
+
+eval { $abstract->select('foo', '*', {-ne => 'bar.baz'}) };
+like $@, qr/-ne => bar.baz doesn't work/, 'right error';
 
 done_testing();

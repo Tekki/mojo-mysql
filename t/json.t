@@ -1,4 +1,6 @@
 use Mojo::Base -strict;
+
+use Mojo::JSON;
 use Mojo::mysql;
 use Test::More;
 
@@ -26,5 +28,39 @@ is_deeply $db->query('select name from mojo_json_test where name like "%supergir
 
 is_deeply $db->query('select name from mojo_json_test where name like "%supergirl%"')->expand(1)->hash,
   {name => {nick => 'supergirl'}}, 'name as hash';
+
+# extended JSON
+
+# INSERT
+
+ok $db->query('delete from mojo_json_test'), 'clean db';
+my @testvalues = (
+  {id => 1, name => 'Katniss Everdeen', j => {district => 12, mascot => 'Mockingjay', tournament => 74,}},
+  {
+    id   => 2,
+    name => 'Peeta Mellark',
+    j    => {district => 12, occupation => 'baker', skills => 'camouflage', tournament => 74,}
+  },
+  {id => 3, name => 'Primrose Everdeen',  j => {district => 12, skills     => 'healing'}},
+  {id => 4, name => 'Haymitch Abernathy', j => {district => 12, tournament => 50,}},
+  {id => 5, name => 'Rue',                j => {district => 11, tournament => 74,}},
+  {id => 6, name => 'Gale Hawthorne',     j => {district => 12, occupation => 'miner',}},
+);
+
+for (@testvalues) {
+  ok $db->insert('mojo_json_test', $_), "insert $_->{name}";
+}
+
+# SELECT
+
+is_deeply $db->select('mojo_json_test', '*', {id => 1})->expand->hash, $testvalues[0], 'content for Katniss';
+
+is_deeply $db->select('mojo_json_test', ['name', 'j->>district', 'j->>occupation'], {id => 2})->hash,
+  {district => 12, name => 'Peeta Mellark', occupation => 'baker'}, 'details for Peeta';
+
+is_deeply $db->select('mojo_json_test', ['name'], {'j->>tournament' => 50})->hash,
+  {name => 'Haymitch Abernathy'}, 'Haymitch was in 50';
+
+is_deeply $db->select('mojo_json_test', ['name'], {-e => 'j->skills'})->arrays,['Peeta Mellark','Primrose Everdeen'], 'who has skills';
 
 done_testing;

@@ -1,7 +1,19 @@
 package SQL::Abstract::mysql;
 use Mojo::Base 'SQL::Abstract';
 
+use Mojo::JSON qw(encode_json);
+
 BEGIN { *puke = \&SQL::Abstract::puke }
+
+sub new {
+  my $self = shift->SUPER::new(quote_char => chr(96), name_sep => '.');
+
+  # -e and -ne op
+  push @{$self->{unary_ops}}, {regex => qr/^e$/, handler => '_where_op_EXISTS',},
+    {regex => qr/^ne$/, handler => '_where_op_NOT_EXISTS',};
+
+  return $self;
+}
 
 sub insert {
   my $self    = shift;
@@ -35,8 +47,34 @@ sub insert {
   return wantarray ? ($sql, @bind) : $sql;
 }
 
-sub new {
-  return shift->SUPER::new(quote_char => chr(96), name_sep => '.');
+sub _insert_value {
+  my ($self, $column, $v) = @_;
+
+  if (ref $v eq 'HASH') {
+
+    # THINK: anything useful to do with a HASHREF ? (SQL::Abstract)
+    # ANSWER: Of course, insert JSON!
+    $v = encode_json($v);
+  }
+  return $self->SUPER::_insert_value($column, $v);
+}
+
+sub _json_extract {
+  my ($self, $label, $alias) = @_;
+  return $self->SUPER::_quote($label) unless $label =~ /->/;
+
+  my ($field, $unquote, $path) = $label =~ /(.+)->([>]?)(.+)/;
+  $field = $self->SUPER::_quote($field);
+
+  my $rv = "JSON_EXTRACT($field,'\$.$path')";
+  $rv = "JSON_UNQUOTE($rv)" if $unquote;
+
+  if ($alias) {
+    $path =~ /(\w+)$/;
+    $rv .= " AS $self->{quote_char}$1$self->{quote_char}";
+  }
+
+  return $rv;
 }
 
 sub _order_by {
@@ -101,6 +139,38 @@ sub _order_by {
 
   return $sql, @bind;
 }
+
+sub _select_fields {
+  my ($self, $fields) = @_;
+  return $fields unless ref $fields eq 'ARRAY';
+  if (grep /->/, @$fields) {
+    return join ',', map { $self->_json_extract($_, 1) } @$fields;
+  }
+  else {
+    return join ',', map { $self->_quote($_) } @$fields;
+  }
+}
+
+sub _where_hashpair_SCALAR {
+  my ($self, $k, $v) = @_;
+  if ($k =~ /->/) {
+    $k = \$self->_json_extract($k);
+  }
+  return $self->SUPER::_where_hashpair_SCALAR($k, $v);
+}
+
+sub _where_op_EXISTS {
+  my ($self, $op, $v) = @_;
+
+  $v =~ /(.+)->(.+)/ or puke "-$op => $v doesn't work, use $op => $v->key1.key2 instead";
+
+  return 'JSON_CONTAINS_PATH(' . $self->_quote($1) . ",'one','\$.$2')";
+}
+
+sub _where_op_NOT_EXISTS {
+  return 'NOT ' . shift->_where_op_EXISTS(@_);
+}
+
 1;
 
 =encoding utf8
