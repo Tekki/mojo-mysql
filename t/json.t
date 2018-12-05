@@ -58,9 +58,13 @@ is_deeply $db->select('mojo_json_test', '*', {id => 1})->expand->hash, $testvalu
 is_deeply $db->select('mojo_json_test', ['name', 'j->>district', 'j->>occupation'], {id => 2})->hash,
   {district => 12, name => 'Peeta Mellark', occupation => 'baker'}, 'details for Peeta';
 
-is_deeply $db->select('mojo_json_test', ['name'], {'j->>tournament' => 50})->hash,
-  {name => 'Haymitch Abernathy'}, 'Haymitch was in 50';
+is_deeply $db->select('mojo_json_test', ['name'], {'j->>tournament' => 50})->hash, {name => 'Haymitch Abernathy'},
+  'Haymitch was in 50';
 
-is_deeply $db->select('mojo_json_test', ['name'], {-e => 'j->skills'})->arrays,['Peeta Mellark','Primrose Everdeen'], 'who has skills';
+is_deeply $db->select('mojo_json_test', ['name'], {-e => 'j->skills'})->text, "Peeta Mellark\nPrimrose Everdeen\n",
+  'Peeta and Prim have skills';
+
+is_deeply $db->select('mojo_json_test', ['name'], {-ne => 'j->tournament'})->text,
+  "Primrose Everdeen\nGale Hawthorne\n", 'Prim and Gale were not at the games';
 
 done_testing;

@@ -47,6 +47,9 @@ sub insert {
   return wantarray ? ($sql, @bind) : $sql;
 }
 
+# sub _update_set_values {
+# }
+
 sub _insert_value {
   my ($self, $column, $v) = @_;
 

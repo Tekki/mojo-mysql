@@ -129,4 +129,10 @@ like $@, qr/-e => bar.baz doesn't work/, 'right error';
 eval { $abstract->select('foo', '*', {-ne => 'bar.baz'}) };
 like $@, qr/-ne => bar.baz doesn't work/, 'right error';
 
+# UPDATE
+
+@sql=$abstract->update('foo',{'bar'=> {-set_json => 'bar->baz.yada'}});
+$result=[q|UPDATE `foo` SET `bar` = JSON_SET(`bar`,'$.baz.yada.',?)|, 'something'];
+is_deeply \@sql, $result, 'right query';
+
 done_testing();
