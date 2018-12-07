@@ -10,8 +10,8 @@ my $mysql = Mojo::mysql->new($ENV{TEST_ONLINE});
 my $db    = $mysql->db;
 
 eval {
-  $db->query('drop table if exists mojo_json_test');
-  $db->query('create table mojo_json_test (id int(10), name varchar(60), j json)');
+  $db->query('create table if not exists mojo_json_test (id int(10), name varchar(60), j json)');
+  $db->query('truncate table mojo_json_test');
   $db->query('insert into mojo_json_test (id, name, j) values (?, ?, ?)', $$, $0, {json => {foo => 42}});
 } or do {
   plan skip_all => $@;
@@ -66,5 +66,7 @@ is_deeply $db->select('mojo_json_test', ['name'], {-e => 'j->skills'})->text, "P
 
 is_deeply $db->select('mojo_json_test', ['name'], {-ne => 'j->tournament'})->text,
   "Primrose Everdeen\nGale Hawthorne\n", 'Prim and Gale were not at the games';
+
+$db->query('drop table mojo_json_test') unless $ENV{TEST_KEEP_DB};
 
 done_testing;

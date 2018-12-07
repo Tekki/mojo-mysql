@@ -1,11 +1,12 @@
 use Mojo::Base -strict;
 
 use Test::More;
-use SQL::Abstract::mysql;
+use Mojo::mysql;
 
 # Basics
 
-my $abstract = SQL::Abstract::mysql->new;
+my $mysql    = Mojo::mysql->new;
+my $abstract = $mysql->abstract;
 is_deeply [$abstract->insert('foo', {bar => 'baz'})], ['INSERT INTO `foo` ( `bar`) VALUES ( ? )', 'baz'], 'right query';
 is_deeply [$abstract->select('foo', '*')], ['SELECT * FROM `foo`'], 'right query';
 is_deeply [$abstract->select(['foo', 'bar', 'baz'])], ['SELECT * FROM `foo`, `bar`, `baz`'], 'right query';
