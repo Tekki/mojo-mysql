@@ -140,9 +140,20 @@ sub _order_by {
   return $sql, @bind;
 }
 
+sub _order_by_chunks {
+  my ($self, $arg) = @_;
+  if ($arg =~ /->/) {
+    return $self->_json_extract($arg);
+  }
+  else {
+    return $self->SUPER::_order_by_chunks($arg);
+  }
+}
+
 sub _select_fields {
   my ($self, $fields) = @_;
   return $fields unless ref $fields eq 'ARRAY';
+
   if (grep /->/, @$fields) {
     return join ',', map { $self->_json_extract($_, 1) } @$fields;
   }
@@ -151,11 +162,57 @@ sub _select_fields {
   }
 }
 
+sub _update_set_values {
+  my ($self, $data) = @_;
+
+  for my $k (sort grep /->/, keys %$data) {
+    my ($label, $path) = $k =~ /(.+)->(.*)/;
+    my $origin = $self->_quote($label);
+    puke "you can\'t update $label and its values in the same query"
+      unless ($data->{$label}->[0] || 'json') =~ /^json/i;
+    if (defined $data->{$k}) {
+      if ($data->{$label}->[0]) {
+        puke "you can\'t update and remove values of $label in the same query"
+          unless $data->{$label}->[0] =~ /^json_set/i;
+      }
+      else {
+        $data->{$label}->[0] = $path ? $self->_sqlcase('json_set(') . "$origin)" : '?';
+      }
+      my $placeholder;
+      if (ref $data->{$k}) {
+        $data->{$k} = encode_json($data->{$k});
+        $placeholder = $self->_sqlcase('cast(? as json)');
+      }
+      else {
+        $placeholder = '?';
+      }
+
+      $data->{$label}->[0] =~ s/\)$/,'\$.$path',$placeholder)/ if $path;
+      push @{$data->{$label}}, $data->{$k};
+    }
+    else {
+      if ($data->{$label}->[0]) {
+        puke "you can\'t update and remove values of $label in the same query"
+          unless $data->{$label}->[0] =~ /^json_remove/i;
+      }
+      else {
+        $data->{$label}->[0] = $self->_sqlcase('json_remove(') . "$origin)";
+      }
+      $data->{$label}->[0] =~ s/\)$/,'\$.$path')/;
+    }
+    delete $data->{$k};
+  }
+
+  return $self->SUPER::_update_set_values($data);
+}
+
 sub _where_hashpair_SCALAR {
   my ($self, $k, $v) = @_;
+
   if ($k =~ /->/) {
     $k = \$self->_json_extract($k);
   }
+
   return $self->SUPER::_where_hashpair_SCALAR($k, $v);
 }
 
@@ -164,11 +221,12 @@ sub _where_op_EXISTS {
 
   $v =~ /(.+)->(.+)/ or puke "-$op => $v doesn't work, use $op => $v->key1.key2 instead";
 
-  return 'JSON_CONTAINS_PATH(' . $self->_quote($1) . ",'one','\$.$2')";
+  return $self->_sqlcase('json_contains_path(') . $self->_quote($1) . ",'one','\$.$2')";
 }
 
 sub _where_op_NOT_EXISTS {
-  return 'NOT ' . shift->_where_op_EXISTS(@_);
+  my $self = shift;
+  return $self->_sqlcase('not ') . $self->_where_op_EXISTS(@_);
 }
 
 1;
