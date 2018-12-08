@@ -247,7 +247,8 @@ SQL::Abstract::mysql - MySQL / MariaDB
   my $abstract = $mysql->abstract;
 
   say $abstract->insert('some_table', \%some_values, \%some_options);
-  say $abstract->select('some_table');
+  say $abstract->update('some_table', \%some_values, \%some_options);
+  say $abstract->select('some_table', \@some_fields, \%some_filters, \%some_options);
 
 =head1 DESCRIPTION
 
@@ -387,6 +388,63 @@ pass literal SQL are supported.
 
   # "select * from some_table for update skip locked"
   $abstract->select('some_table', '*', undef, {for => \'update skip locked'});
+
+=head1 NESTED DATA (JSON)
+
+=head2 arrow operator
+
+C<SQL::Abstract::mysql> generates queries to manipulate nested data in databases
+that support JSON (starting with MySQL 5.7 and MariaDB 10.2).
+
+Paths to values are represented with an arrow as C<< table.field->path.to.value >>.
+If data is read, there is a distinction between single and double arrows.
+C<< field->key >> returns the object for a given key, C<< field->>key >> its value.
+
+=head2 insert nested data
+
+To insert data, hash references can be passed directly to L</insert>.
+
+  my %data = (field1 => 'value1', document => {...}, ...);
+  $abstract->insert('some_table', \%data);
+
+=head2 select and filter nested data
+
+L<Select|/select> queries with arrow operators return hash references with the selected values
+at the first level.
+
+  # returns {key1 => 'value1', key2 => {...}}
+  $abstract->select('some_table', ['document->>key1', 'document->key2']);
+
+Paths are valid as filters too.
+
+  # key1 == 50
+  $abstract->select('some_table', '*', {'document->>key1' => 50});
+  # key1 exists
+  $abstract->select('some_table', '*', {-e => 'document->key1'});
+  # key1 doesn't exist
+  $abstract->select('some_table', '*', {-ne => 'document->key1'});
+
+In the same way they can be used to sort the result.
+
+  # ordered by the value of key1
+  $abstract->select('some_table', '*', undef, {order_by => 'document->>key1'});
+
+=head2 update keys and values
+
+Single keys and values are directly accessible, without the need to read and write the
+whole data structure.
+
+  # 'new value' for key1
+  $abstract->update('some_table', {'document->key1' => 'new value'});
+  # new object for key2; not working on MariaDB
+  $abstract->update('some_table', {'document->key2' => \%new_object});
+  # remove key3, don't combine with the above
+  $abstract->update('some_table', {'document->key3' => undef});
+
+To replace the content of a field a the top level, use an arrow without path.
+
+  # add new document; not working on MariaDB
+  $abstract->update('some_table', {'document->' => \%new_document});
 
 =head1 SEE ALSO
 
