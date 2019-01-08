@@ -1,12 +1,12 @@
 package SQL::Abstract::mysql;
 use Mojo::Base 'SQL::Abstract';
 
-use Mojo::JSON qw(encode_json);
+use Mojo::JSON 'encode_json';
 
 BEGIN { *puke = \&SQL::Abstract::puke }
 
 sub new {
-  my $self = shift->SUPER::new(quote_char => chr(96), name_sep => '.');
+  my $self = shift->SUPER::new(@_);
 
   # -e and -ne op
   push @{$self->{unary_ops}}, {regex => qr/^e$/, handler => '_where_op_EXISTS',},
@@ -255,6 +255,18 @@ SQL::Abstract::mysql - Generate SQL from Perl data structures for MySQL and Mari
 
 L<SQL::Abstract::mysql> extends L<SQL::Abstract> with a few MySQL / MariaDB
 features used by L<Mojo::mysql>. It was inspired by L<SQL::Abstract::Pg>.
+
+=head1 CONSTRUCTOR
+
+=head2 new
+
+  my $abstract = SQL::Abstract::mysql->new(quote_char => chr(96), name_sep => '.');
+
+Creates a new L<SQL::Abstract::mysql>. The same as:
+
+  use Mojo::mysql;
+  my $mysql = Mojo::mysql->new;
+  my $abstract = $mysql->abstract;
 
 =head1 METHODS
 
