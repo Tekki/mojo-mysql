@@ -81,15 +81,13 @@ like $@, qr/for value "update skip locked" is not allowed/, 'right error';
 eval { $abstract->select('foo', '*', undef, {for => []}) };
 like $@, qr/ARRAYREF/, 'right error';
 
-# JSON
-
-# INSERT
+note 'JSON: INSERT';
 
 @sql = $abstract->insert('foo', {bar => 'baz', yada => {wibble => 'wobble'}});
 $result = [q|INSERT INTO `foo` ( `bar`, `yada`) VALUES ( ?, ? )|, 'baz', '{"wibble":"wobble"}'];
 is_deeply \@sql, $result, 'right query';
 
-# SELECT
+note 'JSON: SELECT';
 
 @sql = $abstract->select('foo', ['bar', 'bar->baz', 'bar->>baz.yada']);
 $result = [
@@ -113,7 +111,7 @@ is_deeply \@sql, $result, 'right query';
 $result = [q|SELECT * FROM `foo` ORDER BY JSON_UNQUOTE(JSON_EXTRACT(`bar`,'$.baz'))|,];
 is_deeply \@sql, $result, 'right query';
 
-# SELECT, unsupported value
+note 'JSON: SELECT, unsupported value';
 
 eval { $abstract->select('foo', '*', {-e => 'bar.baz'}) };
 like $@, qr/-e => bar.baz doesn't work/, 'right error';
@@ -121,7 +119,7 @@ like $@, qr/-e => bar.baz doesn't work/, 'right error';
 eval { $abstract->select('foo', '*', {-ne => 'bar.baz'}) };
 like $@, qr/-ne => bar.baz doesn't work/, 'right error';
 
-# UPDATE
+note 'JSON: UPDATE';
 
 @sql = $abstract->update('foo', {'bar->baz.yada' => 'wibble'});
 $result = [q|UPDATE `foo` SET `bar` = JSON_SET(`bar`,'$.baz.yada',?)|, 'wibble'];
@@ -147,7 +145,7 @@ is_deeply \@sql, $result, 'right query';
 $result = [q|UPDATE `foo` SET `bar` = JSON_REMOVE(`bar`,'$.baz','$.yada')|];
 is_deeply \@sql, $result, 'right query';
 
-# UPDATE, unsupported value
+note 'JSON: UPDATE, unsupported value';
 
 eval { @sql = $abstract->update('foo', {'bar->baz' => 'wibble', 'bar->yada' => undef}) };
 like $@, qr/you can't update and remove values of bar in the same query/, 'right error';
