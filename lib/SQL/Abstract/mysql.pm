@@ -242,10 +242,6 @@ SQL::Abstract::mysql - Generate SQL from Perl data structures for MySQL and Mari
   use SQL::Abstract::mysql;
 
   my $abstract = SQL::Abstract::mysql->new(quote_char => chr(96), name_sep => '.');
-  # The same as
-  use Mojo::mysql;
-  my $mysql = Mojo::mysql->new;
-  my $abstract = $mysql->abstract;
 
   say $abstract->insert('some_table', \%some_values, \%some_options);
   say $abstract->update('some_table', \%some_values, \%some_options);

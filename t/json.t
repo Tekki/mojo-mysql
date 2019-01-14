@@ -74,7 +74,7 @@ is $db->select('mojo_json_test', ['name'], {-e => 'j->tournament'}, ['j->tournam
 ok $db->update('mojo_json_test', {'j->mascot' => 'Mockingjay'}, {id => 1}), 'Katniss has a mascot';
 is $db->select('mojo_json_test', ['j->>mascot'], {id => 1})->array->[0], 'Mockingjay', 'it\'s a Mockingjay';
 
-eval { ok $db->update('mojo_json_test', {'j->pet' => {name => 'Buttercup', cat => \1}}, {id => 3}), 'Prim has a pet'; };
+eval { ok $db->update('mojo_json_test', {'j->pet' => {name => 'Buttercup', cat => 1}}, {id => 3}), 'Prim has a pet'; };
 SKIP: {
   skip 'not supported on MariaDB' if $@ =~ /MariaDB/;
   is_deeply $db->select('mojo_json_test', ['j->pet'], {id => 3})->expand->hash,
